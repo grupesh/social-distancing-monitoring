@@ -1,0 +1,29 @@
+NOTE on EPFL RGBD dataset (https://drive.switch.ch/index.php/s/Qd7H855d0w4fptO)
+
+1. Data
+- So far I have been working on 'epfl_lab' only. Their lab is an open space so I think it is better than 'epfl_corridor' which is captured in narrower and longer space.
+
+2. Calibration matrix
+- calibration.yaml
+- Use this code to load yaml and undistort the image (using provided distortion coefficients)
+
+"""
+import numpy as np
+import cv2
+import yaml
+
+yaml_lab = yaml.safe_load(open('./calibration.yaml', 'r'))
+K_lab = np.array(yaml_lab['K])
+Pwc_lab = np.array(yaml_lab['Pwc'])
+dist_lab = np.array(yaml_lab['dist'])
+
+img = cv2.imread('./epfl_lab/20140804_160621_00/rgb00000.png')
+img_depth = cv2.imread('./epfl_lab/20140804_160621_00/depth00000.png', cv2.IMREAD_UNCHANGED)
+
+img_undist = cv2.undistort(img, K_lab, dist_lab, None)
+"""
+
+3. Ground truth
+- 'ground_truth_image_plane.yaml': bounding boxes in the image coordinates (to test the accuracy of EfficientDet) 
+- 'ground_truth_ground_plane.yaml': location in the ground plane. This will be compared against the bottom center location of the bounding box from EfficientDet after being IPM'ed.
+
