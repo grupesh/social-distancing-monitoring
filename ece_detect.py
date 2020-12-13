@@ -47,10 +47,6 @@ def find_violation(pts, dist=2.0):
     pairs = []
     for i in np.arange(0, n, 1):
         for j in np.arange(i+1, n, 1):
-            print(pts[i])
-            left = pts[i]
-            right = pts[j]
-            total = np.array(left) - np.array(right)
             if np.linalg.norm(np.array(pts[i]) - np.array(pts[j])) < dist:
                 pairs.append((i, j))
     return pairs
@@ -178,11 +174,14 @@ def main(yaml_path,gt_path=""):
     while rgb_cap.isOpened():
         while depth_cap.isOpened():
             ret,rgb_img = rgb_cap.read()
+            if ret is False:
+                rgb_cap.release()
+                depth_cap.release()
+                break
             if(rgb_img.shape[2] > 3):
                 # Remove alpha channel
                 #test = np.zeros((428,512,3), dtype = "uint8")
                 rgb_img = cv2.cvtColor(rgb_img,cv2.COLOR_BGRA2BGR)
-                print(rgb_img.shape)
             ret,depth_img = depth_cap.read()
 
             #cv2.imshow("RGB",rgb_img)
@@ -197,11 +196,11 @@ def main(yaml_path,gt_path=""):
             boxes = getBoxesFromGT(i_frame, gt,rgb_img)
 
             #Debug: Draw on frame
-            debug_img = np.copy(rgb_img)
-            for box in boxes:
-                cv2.rectangle(debug_img,(box[0],box[1]),(box[2],box[3]),(255,0,0),3)
-            cv2.imshow("Debug Boxes", debug_img)
-            cv2.waitKey(1)
+            #debug_img = np.copy(rgb_img)
+            #for box in boxes:
+            #    cv2.rectangle(debug_img,(box[0],box[1]),(box[2],box[3]),(255,0,0),3)
+            #cv2.imshow("Debug Boxes", debug_img)
+            #cv2.waitKey(1)
             #Use IPM
             #ipm_points = []
             ipm_mat = [] # NEEDS TO BE REPLACED WITH OUR IPM MATRIX
@@ -219,11 +218,11 @@ def main(yaml_path,gt_path=""):
             violation_pairs = find_violation(stereo_points)
 
             # Here is an example of placing dots and anomaly lines
-            plt.cla()
-            ax = fig.add_subplot(111, projection='3d')
-            if(len(stereo_points) > 0 ):
-                plotPeopleAndPairs(stereo_points, violation_pairs,ax)
-            fig.savefig(os.path.join('test_results', 'frame%04d.png' % i_frame))
+            #plt.cla()
+            #ax = fig.add_subplot(111, projection='3d')
+            #if(len(stereo_points) > 0 ):
+            #    plotPeopleAndPairs(stereo_points, violation_pairs,ax)
+            #fig.savefig(os.path.join('test_results', 'frame%04d.png' % i_frame))
             #plt.draw()
             #plt.show(block=False)
             print("Frame: ", i_frame)
