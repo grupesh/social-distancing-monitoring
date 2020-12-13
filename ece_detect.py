@@ -47,7 +47,7 @@ def find_violation(pts, dist=2.0):
     pairs = []
     for i in np.arange(0, n, 1):
         for j in np.arange(i+1, n, 1):
-            if np.linalg.norm(np.array(pts[i]) - np.array(pts[j])) < dist:
+            if np.linalg.norm(pts[i] - pts[j]) < dist:
                 pairs.append((i, j))
     return pairs
 
@@ -105,6 +105,7 @@ def plotPeopleAndPairs(pts_world, pairs,ax):
     if len(pts_world) == 1:
         ax.plot(pts_world[0][0], pts_world[0][1],pts_world[0][2], 'og', alpha=0.5)
     else:
+        print(pts_world[:,0])
         ax.plot(pts_world[:, 0], pts_world[:, 1],pts_world[:,2], 'og', alpha=0.5)
     for pair in pairs:
         data = np.array([pts_world[pair[0]], pts_world[pair[1]]])
@@ -214,19 +215,22 @@ def main(yaml_path,gt_path=""):
             #Here is where we'd get stereo points
             stereo_points = []
             find3DPeopleStereo(boxes, depth_img, in_mat, ex_mat, stereo_points)
+            stereo_points = np.array(stereo_points)
             # Find Anomaly Pairs --------------------------------------------------------------------------------------
             violation_pairs = find_violation(stereo_points)
 
             # Here is an example of placing dots and anomaly lines
-            #plt.cla()
-            #ax = fig.add_subplot(111, projection='3d')
-            #if(len(stereo_points) > 0 ):
-            #    plotPeopleAndPairs(stereo_points, violation_pairs,ax)
-            #fig.savefig(os.path.join('test_results', 'frame%04d.png' % i_frame))
+            plt.cla()
+            ax = fig.add_subplot(111, projection='3d')
+            if(len(stereo_points) > 0 ):
+                plotPeopleAndPairs(stereo_points, violation_pairs,ax)
+            fig.savefig(os.path.join('test_results', 'frame%04d.png' % i_frame))
             #plt.draw()
             #plt.show(block=False)
             print("Frame: ", i_frame)
             i_frame += 1
+            if i_frame == 236:
+                print("stop")
 
             # Maintain Anomaly Statistics --------------------------------------------------------------------------
 
