@@ -150,6 +150,15 @@ def run3DVisualizationStereo(depthPoints, centroids, violations, frame, render=F
         r = point[3][0]
         g = point[3][1]
         b = point[3][2]
+        r *= 2
+        g *= 2
+        b *= 2
+        if (r > 1.0):
+            r = 1.0
+        if (g > 1.0):
+            g = 1.0
+        if (b > 1.0):
+            b = 1.0
         depthColor.append([r,g,b])
 
     pos = np.array(depthPos)
@@ -188,11 +197,10 @@ def run3DVisualizationStereo(depthPoints, centroids, violations, frame, render=F
         view.add(tube)
     
     view.camera = 'turntable'  # or try 'arcball'
-    #view.camera.center = (3276.1261138916016, -4325.9716796875, 1229.1027292970102)
     view.camera.center =  (1420.80716141, -2228.19104073, 1995.07124811)
-    view.camera.elevation = 32.0
-    view.camera.azimuth = -129.0
-    view.camera.distance = 5634.861006761833
+    view.camera.elevation = 20.0 #32.0
+    view.camera.azimuth = -92.0 #-129.0
+    view.camera.distance = 4656.909922943663 #5634.861006761833
     view.camera.fov = 60
     
     # Add a colored 3D axis for orientation
@@ -203,7 +211,7 @@ def run3DVisualizationStereo(depthPoints, centroids, violations, frame, render=F
         io.write_png(fname,img)
     else:
         vispy.app.run()
-    #print(view.camera.elevation, view.camera.azimuth, view.camera.distance)
+    print(view.camera.elevation, view.camera.azimuth, view.camera.distance)
     print(view.camera.center)
 def run3DVisualizationIPM(ipmPoints, centroids, violations, frame, render=False):
     '''

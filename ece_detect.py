@@ -296,4 +296,4 @@ if __name__ == '__main__':
     # a) the yaml file path with the calibration information
     # b) the detection coming from bounding boxes
     #main(yaml_path='calibration/calibration.yaml')
-    main(yaml_path='calibration/calibration.yaml',gt_path='bbox_gt.pkl')
+    main(yaml_path='calibration/calibration.yaml',gt_path='bbox_effdet.pkl')
