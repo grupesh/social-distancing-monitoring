@@ -11,6 +11,7 @@ import vispy.scene
 from vispy.scene import visuals
 import vispy.io as io
 import sys
+from vispy.gloo.util import _screenshot
 
 
 def convertPixelLocTo3DWorldStereo(row, col, depthImage, K, Pcw):
@@ -187,7 +188,8 @@ def run3DVisualizationStereo(depthPoints, centroids, violations, frame, render=F
         view.add(tube)
     
     view.camera = 'turntable'  # or try 'arcball'
-
+    #view.camera.center = (3276.1261138916016, -4325.9716796875, 1229.1027292970102)
+    view.camera.center =  (1420.80716141, -2228.19104073, 1995.07124811)
     view.camera.elevation = 32.0
     view.camera.azimuth = -129.0
     view.camera.distance = 5634.861006761833
@@ -197,12 +199,12 @@ def run3DVisualizationStereo(depthPoints, centroids, violations, frame, render=F
     axis = visuals.XYZAxis(parent=view.scene)
     if (render):
         img = canvas.render()
-        fname = "stereo" + str(frame) + ".png"
+        fname = "out_renders/stereo" + str(frame) + ".png"
         io.write_png(fname,img)
     else:
         vispy.app.run()
     #print(view.camera.elevation, view.camera.azimuth, view.camera.distance)
-
+    print(view.camera.center)
 def run3DVisualizationIPM(ipmPoints, centroids, violations, frame, render=False):
     '''
     Takes all the world coordinates produced by the IPM method, and their color values and plots them in 3D space, using vispy. Also draws halo cylinders around 3D points corresponding to people centroids (from efficientdet bounding boxes). Also draws 3D lines (tubes) between the halos that represent a pair of people which are violating the 6' restriction.
@@ -279,7 +281,7 @@ def run3DVisualizationIPM(ipmPoints, centroids, violations, frame, render=False)
     axis = visuals.XYZAxis(parent=view.scene)
     if (render):
         img = canvas.render()
-        fname = "IPM" + str(frame) + ".png"
+        fname = "out_renders/IPM" + str(frame) + ".png"
         io.write_png(fname,img)
     else:
         vispy.app.run()
