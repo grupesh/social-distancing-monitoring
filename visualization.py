@@ -119,7 +119,7 @@ def imagePlaneToWorldCoordIPM(rgbImage, K, Pwc):
 
     return points
 
-def run3DVisualizationStereo(depthPoints, centroids, violations):
+def run3DVisualizationStereo(depthPoints, centroids, violations, frame, render=False):
     '''
     Takes all the world coordinates produced by the depth map, and their color values and plots them in 3D space, using vispy. Also draws halo cylinders around 3D points corresponding to people centroids (from efficientdet bounding boxes). Also draws 3D lines (tubes) between the halos that represent a pair of people which are violating the 6' restriction.
 
@@ -129,12 +129,16 @@ def run3DVisualizationStereo(depthPoints, centroids, violations):
                     centroids (list): A list of lists, where each inner list object is a 3D world point, representing the centroid of a person (found using the efficientdet bounding boxes), in format [x,y,z]
                     
                     violations (list): A list of lists, where each inner list is a pair of integers, which are two indices in the bBoxes list representing a pair of people violating the 6' restriction. Formatted as [[pi1,pi2],[pi3,pi4]]
+
+                    frame (int): frame number for the filename to save to
+
+                    render (bool): whether or not to render canvas to a file
                     
             Returns:
     '''
     
     # Create canvas to draw everything
-    canvas = vispy.scene.SceneCanvas(keys='interactive', show=True)
+    canvas = vispy.scene.SceneCanvas(keys='interactive', show=True, size=(1920,1080))
     view = canvas.central_widget.add_view()
 
     # Unpack depth and ipm points
@@ -184,18 +188,22 @@ def run3DVisualizationStereo(depthPoints, centroids, violations):
     
     view.camera = 'turntable'  # or try 'arcball'
 
-
-    view.camera.elevation = 11.0#21.5
-    view.camera.azimuth = -103.5#-92.5
-    view.camera.distance = 7500
+    view.camera.elevation = 32.0
+    view.camera.azimuth = -129.0
+    view.camera.distance = 5634.861006761833
+    view.camera.fov = 60
     
     # Add a colored 3D axis for orientation
     axis = visuals.XYZAxis(parent=view.scene)
-    #img = canvas.render()
-    #io.write_png("test.png",img)
-    vispy.app.run()
+    if (render):
+        img = canvas.render()
+        fname = "stereo" + str(frame) + ".png"
+        io.write_png(fname,img)
+    else:
+        vispy.app.run()
+    #print(view.camera.elevation, view.camera.azimuth, view.camera.distance)
 
-def run3DVisualizationIPM(ipmPoints, centroids, violations):
+def run3DVisualizationIPM(ipmPoints, centroids, violations, frame, render=False):
     '''
     Takes all the world coordinates produced by the IPM method, and their color values and plots them in 3D space, using vispy. Also draws halo cylinders around 3D points corresponding to people centroids (from efficientdet bounding boxes). Also draws 3D lines (tubes) between the halos that represent a pair of people which are violating the 6' restriction.
 
@@ -205,12 +213,16 @@ def run3DVisualizationIPM(ipmPoints, centroids, violations):
                     centroids (list): A list of lists, where each inner list object is a 3D world point, representing the centroid of a person (found using the efficientdet bounding boxes), in format [x,y,z]
                     
                     violations (list): A list of lists, where each inner list is a pair of integers, which are two indices in the bBoxes list representing a pair of people violating the 6' restriction. Formatted as [[pi1,pi2],[pi3,pi4]]
+
+                    frame (int): frame number for the filename to save to
+
+                    render (bool): whether or not to render canvas to a file
                     
             Returns:
     '''
     
     # Create canvas to draw everything
-    canvas = vispy.scene.SceneCanvas(keys='interactive', show=True)
+    canvas = vispy.scene.SceneCanvas(keys='interactive', show=True, size=(1920,1080))
     view = canvas.central_widget.add_view()
 
     # Unpack ipm points
@@ -228,9 +240,9 @@ def run3DVisualizationIPM(ipmPoints, centroids, violations):
 
     # 3D scatter plot to show depth map pointcloud
     scatter = visuals.Markers()
+    scatter.antialias = 0
     scatter.set_data(pos, edge_color=None, face_color=colors, size=5)
     view.add(scatter)
-
     # Draw cylinders around centroids
     for point in centroids:
         x,y,z = point
@@ -240,7 +252,7 @@ def run3DVisualizationIPM(ipmPoints, centroids, violations):
         # Move cylinder to correct location in 3D space
         # Make sure to negate the y value, otherwise everything will be mirrored
         vertices = cyl_mesh.get_vertices()
-        center=np.array([x,-y,z],dtype=np.float32)
+        center=np.array([x,-y,z+150],dtype=np.float32)
         vtcs = np.add(vertices,center)
         cyl_mesh.set_vertices(vtcs)
 
@@ -254,22 +266,25 @@ def run3DVisualizationIPM(ipmPoints, centroids, violations):
         x2,y2,z2 = centroids[pair[1]]
         #lin = visuals.Line(pos=np.array([[x1,-y1,z1+1],[x2,-y2,z2+1]]), color='r', method='gl')
         #view.add(lin)
-        tube = visuals.Tube(points=np.array([[x1,-y1,z1],[x2,-y2,z2]]), radius=50, color='red')
+        tube = visuals.Tube(points=np.array([[x1,-y1,z1+150],[x2,-y2,z2+150]]), radius=50, color='red')
         view.add(tube)
     
     view.camera = 'turntable'  # or try 'arcball'
 
-    '''
-    view.camera.elevation = 39.0
-    view.camera.azimuth = -83.0
-    view.camera.distance = 10980.75
-    '''
-
+    view.camera.elevation = 30.5 
+    view.camera.azimuth = -78.5
+    view.camera.distance = 8250.000000000002
+    view.camera.fov = 60
     # Add a colored 3D axis for orientation
     axis = visuals.XYZAxis(parent=view.scene)
-    #img = canvas.render()
-    #io.write_png("test.png",img)
-    vispy.app.run()
+    if (render):
+        img = canvas.render()
+        fname = "IPM" + str(frame) + ".png"
+        io.write_png(fname,img)
+    else:
+        vispy.app.run()
+
+    #print(view.camera.elevation, view.camera.azimuth, view.camera.distance)
     
 if __name__ == "__main__":
     # Get the calibration matrices

@@ -237,10 +237,6 @@ def main(yaml_path,gt_path=""):
                 
             violation_pairs = find_violation(np.array(world3DCentroids), dist=1500)
 
-            print("Stereo Centroids")
-            print(world3DCentroids)
-            print("Stereo Violations")
-            print(violation_pairs)
             person_centroids = []
             for i in range(stereo_points.shape[0]):
                 # Get the 3D world x,y,z coordinate
@@ -251,7 +247,7 @@ def main(yaml_path,gt_path=""):
 
             # Create depth map's point cloud
             points3DWorldStereo = imagePlaneToWorldCoordStereo(rgb_img, depth_img, in_mat, ex_mat)
-            run3DVisualizationStereo(points3DWorldStereo,world3DCentroids,violation_pairs)
+            run3DVisualizationStereo(points3DWorldStereo,world3DCentroids,violation_pairs, i_frame, render=True)
 
 
             pts_world = []
@@ -270,17 +266,12 @@ def main(yaml_path,gt_path=""):
                 x = pts_world[i][0]
                 y = pts_world[i][1]
                 z = pts_world[i][2]
-                person_centroids.append([x,y,z])
-
-            print("IPM Centroids")
-            print(person_centroids)
-            print("IPM Violations")
-            print(violation_pairs)       
+                person_centroids.append([x,y,z])     
 
             points3DWorldIPM = imagePlaneToWorldCoordIPM(rgb_img, in_mat, Pwc)
             
 
-            run3DVisualizationIPM(points3DWorldIPM,person_centroids,violation_pairs)
+            run3DVisualizationIPM(points3DWorldIPM,person_centroids,violation_pairs, i_frame, render=True)
             '''
             plt.cla()
             ax = fig.add_subplot(111, projection='3d')
