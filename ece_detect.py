@@ -187,7 +187,7 @@ def main(yaml_path,gt_path=""):
             ret,depth_img = depth_cap.read()
 
 
-            if (i_frame < 562):
+            if (i_frame < 412):
                 i_frame += 1
                 continue
 
