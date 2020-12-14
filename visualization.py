@@ -30,7 +30,7 @@ def convertPixelLocTo3DWorldStereo(row, col, depthImage, K, Pcw):
             Returns:
                     point3dWorld (1x3 numpy array): World coordinate (x,y,z)
     '''
-    point = np.array([row,col]).T
+    point = np.array([col,row]).T
     depth = depthImage[row,col]
     point3dCam = getCamera3DfromImage(point, depth, K)
     point3dWorld = getGlobal3DfromCamera3D(point3dCam,Pcw)
@@ -89,7 +89,7 @@ def imagePlaneToWorldCoordStereo(rgbImage, depthImage, K, Pcw):
                 points.append([point3dWorld[0], -point3dWorld[1], point3dWorld[2], avg_clr])
     return points
 
-def imagePlaneToWorldCoordIPM(rgbImage, K, Pcw):
+def imagePlaneToWorldCoordIPM(rgbImage, K, Pwc):
     '''
     Returns the set of (x,y,z,c) world coordinates (with color) of each pixel in a 2D image, using the ipm approach.
 
@@ -98,14 +98,14 @@ def imagePlaneToWorldCoordIPM(rgbImage, K, Pcw):
                     
                     K (3x3 numpy array): The intrinsic matrix
                     
-                    Pcw (numpy array): The extrinsic matrix
+                    Pwc (numpy array): The world to camera matrix
             Returns:
                     points (list): World coordinate with color (x,y,z,[r,g,b])
     '''
     height, width = rgbImage.shape[0:2]
     points = []
     
-    H = generate_ipm_matrix(K, Pcw)
+    H = generate_ipm_matrix(K, Pwc)
     for r in range(height):
         for c in range(width):
             point3dWorld = convertPixelLocTo3DWorldIPM(r, c, H)
@@ -114,8 +114,8 @@ def imagePlaneToWorldCoordIPM(rgbImage, K, Pcw):
             avg_clr[0] = avg_clr[2]
             avg_clr[2] = tmp
 
-            if ( math.sqrt(point3dWorld[0]**2 + point3dWorld[1]**2) < 8000):
-                points.append([point3dWorld[0], point3dWorld[1], 0, avg_clr])
+            if (point3dWorld[0] > -1000 and math.sqrt(point3dWorld[0]**2 + point3dWorld[1]**2) < 8000):
+                points.append([point3dWorld[0], -point3dWorld[1], 0, avg_clr])
 
     return points
 
@@ -165,7 +165,7 @@ def run3DVisualizationStereo(depthPoints, centroids, violations):
         # Move cylinder to correct location in 3D space
         # Make sure to negate the y value, otherwise everything will be mirrored
         vertices = cyl_mesh.get_vertices()
-        center=np.array([x,-y,z],dtype=np.float32)
+        center=np.array([x,y,z],dtype=np.float32)
         vtcs = np.add(vertices,center)
         cyl_mesh.set_vertices(vtcs)
 
@@ -179,7 +179,7 @@ def run3DVisualizationStereo(depthPoints, centroids, violations):
         x2,y2,z2 = centroids[pair[1]]
         #lin = visuals.Line(pos=np.array([[x1,-y1,z1+1],[x2,-y2,z2+1]]), color='r', method='gl')
         #view.add(lin)
-        tube = visuals.Tube(points=np.array([[x1,-y1,z1],[x2,-y2,z2]]), radius=50, color='red')
+        tube = visuals.Tube(points=np.array([[x1,y1,z1],[x2,y2,z2]]), radius=50, color='red')
         view.add(tube)
     
     view.camera = 'turntable'  # or try 'arcball'
@@ -228,7 +228,6 @@ def run3DVisualizationIPM(ipmPoints, centroids, violations):
 
     # 3D scatter plot to show depth map pointcloud
     scatter = visuals.Markers()
-    print(pos)
     scatter.set_data(pos, edge_color=None, face_color=colors, size=5)
     view.add(scatter)
 

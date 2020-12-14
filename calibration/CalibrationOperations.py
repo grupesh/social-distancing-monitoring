@@ -24,8 +24,8 @@ def getCamera3DfromImage(p, depth, in_mat):
 
     # Get camera based values (without depth adjustment)
     #Note that in our point we have y as the 1st dimension and x as the second
-    xc = (p[1] - offset_x)/focal_x
-    yc = (p[0] - offset_y)/focal_y
+    xc = (p[0] - offset_x)/focal_x
+    yc = (p[1] - offset_y)/focal_y
 
     # Adjust for depth
     xc = xc * depth

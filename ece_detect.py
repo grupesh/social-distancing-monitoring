@@ -13,8 +13,6 @@ from visualization import imagePlaneToWorldCoordStereo, imagePlaneToWorldCoordIP
 import yaml
 import cv2
 
-import keyboard
-
 # Not sure if this is still needed for our categories
 from utils import COCO_INSTANCE_CATEGORY_NAMES as LABELS
 import cv2
@@ -73,18 +71,17 @@ def runPyTorch(raw_img,device,model):
 
     return boxes, classIDs, scores
 
-def find3DPeople_IPM(boxes, classIDs, scores, thr_score, ipm_mat, pts_world):
+def find3DPeople_IPM(boxes, ipm_mat, pts_world):
     for i in range(len(boxes)):
-        if classIDs[i] == 1 and scores[i] > thr_score:
-            # extract the bounding box coordinates
-            (x1, y1) = (boxes[i][0], boxes[i][1])
-            (x2, y2) = (boxes[i][2], boxes[i][3])
+        # extract the bounding box coordinates
+        (x1, y1) = (boxes[i][0], boxes[i][1])
+        (x2, y2) = (boxes[i][2], boxes[i][3])
 
-            # find the bottom center position and convert it to world coordinate
-            p_c = np.array([[(x1 + x2) / 2], [y2], [1]])
-            p_w = ipm_mat @ p_c
-            p_w = p_w / p_w[2] # Here they project the point onto the IPM plane: shouldn't it already be their?
-            pts_world.append([p_w[0][0], p_w[1][0],p_w[2][0]])
+        # find the bottom center position and convert it to world coordinate
+        p_c = np.array([[(x1 + x2) / 2], [y2], [1]])
+        p_w = ipm_mat @ p_c
+        p_w = p_w / p_w[2] # Here they project the point onto the IPM plane: shouldn't it already be their?
+        pts_world.append([p_w[0][0], p_w[1][0],p_w[2][0]])
 
 def find3DPeopleStereo(boxes, depth_img, in_mat, ex_mat, pts_world):
     for i in range(len(boxes)):
@@ -100,7 +97,7 @@ def find3DPeopleStereo(boxes, depth_img, in_mat, ex_mat, pts_world):
 
         # Lookup the center
         point3dc = getCamera3DfromImage(point, depth, in_mat)
-        point3d = getGlobal3DfromCamera3D(point3dc,ex_mat)/1000.0 # mm to m
+        point3d = getGlobal3DfromCamera3D(point3dc,ex_mat)
         pts_world.append([point3d[0],point3d[1],point3d[2]])
 
 def plotPeopleAndPairs(pts_world, pairs,ax):
@@ -147,8 +144,8 @@ def main(yaml_path,gt_path=""):
     #os.makedirs(path_result, exist_ok=True)
 
     # initialize detector
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = initPyTorchDetector(device)
+    #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    #model = initPyTorchDetector(device)
 
     # load background
     #img_bkgd_bev = cv2.imread('calibration/' + dataset + '_background_calibrated.png')
@@ -163,6 +160,7 @@ def main(yaml_path,gt_path=""):
     in_mat = np.array(yaml_list['K'])
     # Camera to World Extrinsic
     ex_mat = np.array(yaml_list['Pcw'])
+    Pwc = np.array(yaml_list['Pwc'])
 
 
     # open video of dataset
@@ -186,14 +184,13 @@ def main(yaml_path,gt_path=""):
                 # Remove alpha channel
                 #test = np.zeros((428,512,3), dtype = "uint8")
                 rgb_img = cv2.cvtColor(rgb_img,cv2.COLOR_BGRA2BGR)
-                print("here")
             ret,depth_img = depth_cap.read()
 
-            '''
-            if (i_frame < 40):
+
+            if (i_frame < 562):
                 i_frame += 1
                 continue
-            '''
+
             #cv2.imshow("RGB",rgb_img)
             #cv2.imshow("Depth",depth_img)
             #cv2.waitKey(1)
@@ -226,9 +223,24 @@ def main(yaml_path,gt_path=""):
             find3DPeopleStereo(boxes, depth_img, in_mat, ex_mat, stereo_points)
             stereo_points = np.array(stereo_points)
             # Find Anomaly Pairs --------------------------------------------------------------------------------------
-            violation_pairs = find_violation(stereo_points)
 
-            # Here is an example of placing dots and anomaly lines
+            from visualization import convertPixelLocTo3DWorldStereo
+            world3DCentroids = []
+            for box in boxes:
+                xmin, ymin, xmax, ymax = box
+                xcenter = int((xmin+xmax)/2)
+                ycenter = int((ymin+ymax)/2)
+
+                point = convertPixelLocTo3DWorldStereo(ycenter, xcenter, depth_img, in_mat, ex_mat)
+                x,y,z = point
+                world3DCentroids.append([x,-y,z])
+                
+            violation_pairs = find_violation(np.array(world3DCentroids), dist=1500)
+
+            print("Stereo Centroids")
+            print(world3DCentroids)
+            print("Stereo Violations")
+            print(violation_pairs)
             person_centroids = []
             for i in range(stereo_points.shape[0]):
                 # Get the 3D world x,y,z coordinate
@@ -239,9 +251,34 @@ def main(yaml_path,gt_path=""):
 
             # Create depth map's point cloud
             points3DWorldStereo = imagePlaneToWorldCoordStereo(rgb_img, depth_img, in_mat, ex_mat)
+            run3DVisualizationStereo(points3DWorldStereo,world3DCentroids,violation_pairs)
 
-            points3DWorldIPM = imagePlaneToWorldCoordIPM(rgb_img, in_mat, ex_mat)
-            #run3DVisualizationStereo(points3DWorldStereo,person_centroids,violation_pairs)
+
+            pts_world = []
+            from ipm import generate_ipm_matrix
+            H = generate_ipm_matrix(in_mat,Pwc)
+            find3DPeople_IPM(boxes, H, pts_world)
+            pts_world = np.array(pts_world)
+
+
+            violation_pairs = find_violation(pts_world, dist=1500)
+
+            # Here is an example of placing dots and anomaly lines
+            person_centroids = []
+            for i in range(pts_world.shape[0]):
+                # Get the 3D world x,y,z coordinate
+                x = pts_world[i][0]
+                y = pts_world[i][1]
+                z = pts_world[i][2]
+                person_centroids.append([x,y,z])
+
+            print("IPM Centroids")
+            print(person_centroids)
+            print("IPM Violations")
+            print(violation_pairs)       
+
+            points3DWorldIPM = imagePlaneToWorldCoordIPM(rgb_img, in_mat, Pwc)
+            
 
             run3DVisualizationIPM(points3DWorldIPM,person_centroids,violation_pairs)
             '''
