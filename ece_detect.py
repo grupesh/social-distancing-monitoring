@@ -5,20 +5,11 @@ import numpy as np
 import time
 import pickle
 import matplotlib.pyplot as plt
-from datetime import datetime
-from plotting import plot_frame, plot_frame_one_row, get_roi_pts
 from calibration.CalibrationOperations import getCamera3DfromImage, getGlobal3DfromCamera3D
 from visualization import imagePlaneToWorldCoordStereo, imagePlaneToWorldCoordIPM, run3DVisualizationIPM, run3DVisualizationStereo
 
 import yaml
 import cv2
-
-# Not sure if this is still needed for our categories
-from utils import COCO_INSTANCE_CATEGORY_NAMES as LABELS
-import cv2
-np.set_printoptions(precision=4)
-COLORS = np.random.randint(0, 255, size=(len(LABELS), 3), dtype="uint8")
-
 
 # Our main program is expected to do a few things:
 # Person Location Detection
@@ -90,8 +81,8 @@ def find3DPeopleStereo(boxes, depth_img, in_mat, ex_mat, pts_world):
         (x2, y2) = (boxes[i][2], boxes[i][3])
 
         # Find center of the box
-        x_cen = int((x2-x1)/2.0)
-        y_cen = int((y2-y1)/2.0)
+        x_cen = int((x2+x1)/2.0)
+        y_cen = int((y2+y1)/2.0)
         point = np.array([x_cen, y_cen]).T
         depth = depth_img[y_cen, x_cen]
 
@@ -137,8 +128,7 @@ def main(yaml_path,gt_path=""):
     if gt_path != "":
         with open(gt_path,'rb') as file:
             gt = pickle.load(file)
-    test = gt[238]
-    test1 = test[0]
+
     # Make a results folder to contain output
     #path_result = os.path.join('results', data_time + '_' + detector, dataset)
     #os.makedirs(path_result, exist_ok=True)
@@ -169,8 +159,8 @@ def main(yaml_path,gt_path=""):
     #rgb_cap = cv2.VideoCapture(os.path.join('datasets', 'TownCentreXVID.avi'))
 
     depth_cap = cv2.VideoCapture(os.path.join(r'C:\Users\rohan\Documents\repos\epfl_lab\20140804_160621_00', 'depth%06d.png'))
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    #fig = plt.figure()
+    #ax = fig.add_subplot(111, projection='3d')
     i_frame = 0
     # while cap.isOpened() and i_frame < 5000:
     while rgb_cap.isOpened():
@@ -187,9 +177,9 @@ def main(yaml_path,gt_path=""):
             ret,depth_img = depth_cap.read()
 
 
-            if (i_frame < 412):
-                i_frame += 1
-                continue
+            #if (i_frame < 412):
+            #    i_frame += 1
+            #    continue
 
             #cv2.imshow("RGB",rgb_img)
             #cv2.imshow("Depth",depth_img)
@@ -283,8 +273,7 @@ def main(yaml_path,gt_path=""):
             '''
             print("Frame: ", i_frame)
             i_frame += 1
-            if i_frame == 236:
-                print("stop")
+
 
             # Maintain Anomaly Statistics --------------------------------------------------------------------------
 
