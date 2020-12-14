@@ -69,7 +69,7 @@ def getCentroidfromBbox(bbox, mode):
     elif mode == 'face':
         # return estimation of face location (1/8 from the top - center)
         x_bc = int(bbox[0] + bbox[2] / 2)
-        y_bc = int(bbox[1] + bbox[3] / 8)
+        y_bc = int(bbox[1] + bbox[3] / (8/3))
     else:
         raise Exception("Invalid centroid mode! (getCentroidfromBbox) Should be either of centroid / face")
 
@@ -291,7 +291,90 @@ def computeDistErr_Depth(bbox_gt, bbox_in, pw_gt, K, Pcw, frames_depth, mode, nu
     return distance_gt, distance_in, error, avg_error
 
 
-def loadBboxfromDetector(eff_det):
+def computeDistErr_Depth_Projected(bbox_gt, bbox_in, pw_gt, K, Pcw, frames_depth, mode, num_img=950):
+    distance_gt, distance_in = [], []
+    error = []
+    avg_error = []
+
+    for idx_frame in range(num_img):
+        error_ = []
+        distance_gt_ = []
+        distance_in_ = []
+
+        if len(bbox_gt[idx_frame]) > 0:
+            if np.array_equal(bbox_gt[idx_frame], bbox_in[idx_frame]) is True:
+                # this is only for comparing ground truth pw to the world coordinate that is computed from the bounding box
+                pw_gt_aligned = np.array(pw_gt[idx_frame])
+                bbox_gt_matched = np.array(bbox_gt[idx_frame])
+                bbox_in_matched = np.array(bbox_in[idx_frame])
+
+            else:
+                # align points in world coordinate from gt and efficientdet by matching their bounding boxes
+                row_ind, col_ind = matchBbox(bbox_gt[idx_frame], bbox_in[idx_frame])
+
+                # use only matched boxes
+                pw_gt_matched = np.array(pw_gt[idx_frame])[row_ind]
+                #bbox_gt_matched = np.array(bbox_gt[idx_frame])[row_ind]
+                bbox_in_matched = np.array(bbox_in[idx_frame])[col_ind]
+        else:
+            pw_gt_matched = np.array([])
+            bbox_gt_matched = np.array([])
+            bbox_in_matched = np.array([])
+
+        if len(pw_gt_matched) > 0:
+            # if there is any object in the frame
+            for i in range(len(pw_gt_matched)):
+                for j in range(i+1, len(bbox_in_matched)):
+                    pc_in_obj0 = getCentroidfromBbox(bbox_in_matched[i], mode)
+                    pc_in_obj1 = getCentroidfromBbox(bbox_in_matched[j], mode)
+
+                    # convert (x,y,1) -> (y,x,1)
+                    pc_in_obj0 = np.array([pc_in_obj0[1], pc_in_obj0[0]]).astype('int')
+                    pc_in_obj1 = np.array([pc_in_obj1[1], pc_in_obj1[0]]).astype('int')
+
+                    pcw_in_obj0 = getCamera3DfromImage(pc_in_obj0, frames_depth[idx_frame][int(pc_in_obj0[0]), int(pc_in_obj0[1])], K).astype('float')
+                    pcw_in_obj1 = getCamera3DfromImage(pc_in_obj1, frames_depth[idx_frame][int(pc_in_obj1[0]), int(pc_in_obj1[1])], K).astype('float')
+
+                    # (optional) Use extrinsic matrix to map into the world coordinate. The distance is preserved, so we do not need to perform this to get the distancing.
+                    pw_in_obj0 = getGlobal3DfromCamera3D(pcw_in_obj0, Pcw).astype('float')
+                    pw_in_obj1 = getGlobal3DfromCamera3D(pcw_in_obj1, Pcw).astype('float')
+
+                    if idx_frame == 786:
+                        print(pw_in_obj0)
+                        print(pw_in_obj1)
+
+
+
+                    # project pw_in to z = 0, to eliminate the height difference between centroids.
+                    pw_in_obj0 = pw_in_obj0[:2]
+                    pw_in_obj1 = pw_in_obj1[:2]
+
+                    distance_gt__ = np.linalg.norm(pw_gt_matched[i] - pw_gt_matched[j])
+                    distance_in__ = np.linalg.norm(pw_in_obj0 - pw_in_obj1)
+
+                    distance_gt_.append(distance_gt__)
+                    distance_in_.append(distance_in__)
+
+                    error_.append((distance_gt__ - distance_in__) / distance_gt__ * 100)
+
+            if len(error_) > 0:
+                avg_error.append(np.mean(np.array(error_)))
+            else:
+                avg_error.append(np.nan)
+
+        else:
+            # won't add to the error
+            avg_error.append(np.nan)
+
+        distance_gt.append(distance_gt_)
+        distance_in.append(distance_in_)
+
+        error.append(error_)
+
+    return distance_gt, distance_in, error, avg_error
+
+
+def loadBboxfromEffDet(eff_det):
     bbox_effdet = []
 
     # parse the result from 'efficientdet_detections.txt' and unpack into list
@@ -362,6 +445,39 @@ def loadBboxfromDetector(eff_det):
     return bbox_effdet
 
 
+def loadBboxfromRCNN(path_rcnn):
+    bbox_rcnn = np.load(path_rcnn, allow_pickle=True)
+    bbox_rcnn_out = []
+
+    num_img = bbox_rcnn.shape[0]
+
+    for i in range(num_img):
+        bbox_rcnn_frame = bbox_rcnn[i]
+
+        # if bbox is not empty
+        if bbox_rcnn_frame.size > 0:
+            # remove scores
+            bbox_rcnn_frame = bbox_rcnn_frame[:, :4]
+
+            # rearrange bounding boxes from: (bbox_ymin, bbox_xmin, bbox_ymax, bbox_xmax) -> (xmin, ymin, width, height)
+            bb = bbox_rcnn_frame[:, [1,0,3,2]]
+
+            width = (bb[:, 2] - bb[:, 0]).reshape((bb.shape[0],1))
+            height = (bb[:, 3] - bb[:, 1]).reshape((bb.shape[0],1))
+
+            bb = np.insert(bb, [2], width, axis=1)
+            bb = (np.insert(bb, [3], height, axis=1)[:, :4])
+
+            # sort with the x-center of bbox
+            bb = bb[np.argsort(bb[:,0] + bb[:,2]/2), :].astype('int')
+
+        else:
+            bb = np.array([])
+
+        bbox_rcnn_out.append(bb.tolist())
+
+    return bbox_rcnn_out
+
 if __name__ == '__main__':
 
     """ 
@@ -419,13 +535,13 @@ if __name__ == '__main__':
     '''
 
     """
-    Load bounding boxes from EfficientDet
+    Task 1: Use EfficientDet
     """
     # retrieve bbox from the textfile and get the world coordinate
-    bbox_effdet = loadBboxfromDetector(eff_detections)
+    bbox_effdet = loadBboxfromEffDet(eff_detections)
 
     """
-    Task 1: Get the world coordinate from EfficientDet Bbox using IPM and compute the error against the ground truth
+    Task 1-1: Get the world coordinate from EfficientDet Bbox using IPM and compute the error against the ground truth
     """
     pc_effdet = []
     for bbox_frame in bbox_effdet:
@@ -446,11 +562,57 @@ if __name__ == '__main__':
     print("Average distance error between the ground truth and IPM from efficientdet bbox: %1.3f" % np.nanmean(np.absolute(avg_err_effdet))+"%")    # avg error < 5%
 
     """
-    Task 2: Get the camera coordinate from EfficientDet Bbox & depth map and compute the error against the ground truth
+    Task 1-2: Get the camera coordinate from EfficientDet Bbox & depth map and compute the error against the ground truth
     """
 
     # compute the distance error
-    _, _, err_rgbd, avg_err_rgbd = computeDistErr_Depth(bbox_gt, bbox_effdet, pw_gt, K, Pcw, frames_depth, 'centroid', num_img=950)
-    print("Average distance error between the ground truth and true world coordinate from efficientdet bbox: %1.3f" % np.nanmean(np.absolute(avg_err_rgbd))+"%")    # avg error < 5%
+    _, _, err_effdet_rgbd, avg_err_effdet_rgbd = computeDistErr_Depth(bbox_gt, bbox_effdet, pw_gt, K, Pcw, frames_depth, 'centroid', num_img=950)
+    print("Average distance error between the ground truth and true world coordinate from efficientdet bbox: %1.3f" % np.nanmean(np.absolute(avg_err_effdet_rgbd))+"%")    # avg error < 5%
+
+    # compute the distance error from the projected 3d points
+    _, _, _, avg_err_effdet_rgbd_prj = computeDistErr_Depth_Projected(bbox_gt, bbox_effdet, pw_gt, K, Pcw, frames_depth, 'centroid', num_img=950)
+    print("Average distance error between the ground truth and projected world coordinate from efficientdet bbox: %1.3f" % np.nanmean(np.absolute(avg_err_effdet_rgbd_prj))+"%")    # avg error < 5%
+
+    """
+    Task 2: Use Faster R-CNN
+    """
+    # retrieve bbox from the textfile and get the world coordinate
+    bbox_rcnn = loadBboxfromRCNN('rcnn_detections.npy')
+
+    """
+    Task 2-1: Get the world coordinate from R-CNN Bbox using IPM and compute the error against the ground truth
+    """
+    pc_rcnn = []
+    for bbox_frame in bbox_rcnn:
+        pc_rcnn_ = []
+        if len(bbox_frame) > 0:
+            for bbox in bbox_frame:
+                pc_rcnn_.append(getBCfromBbox(bbox))
+        else:
+            pc_rcnn_.append([])
+
+        pc_rcnn.append(pc_rcnn_)
+
+    # get the pw from ipm
+    pw_ipm_rcnn = getPwfromPc_IPM(pc_rcnn, H_ipm)
+
+    # compute the distance error
+    _, _, error_rcnn, avg_err_rcnn = computeDistErr_IPM(bbox_gt, bbox_rcnn, pw_gt, pw_ipm_rcnn)
+    print("Average distance error between the ground truth and IPM from R-CNN bbox: %1.3f" % np.nanmean(np.absolute(avg_err_rcnn))+"%")    # avg error < 5%
+
+
+    """
+    Task 2-2: Get the camera coordinate from R-CNN Bbox & depth map and compute the error against the ground truth
+    """
+
+    # compute the distance error
+    _, _, err_rcnn_rgbd, avg_err_rcnn_rgbd = computeDistErr_Depth(bbox_gt, bbox_rcnn, pw_gt, K, Pcw, frames_depth, 'centroid', num_img=950)
+    print("Average distance error between the ground truth and true world coordinate from R-CNN bbox: %1.3f" % np.nanmean(np.absolute(avg_err_rcnn_rgbd))+"%")    # avg error < 5%
+
+    # compute the distance error from projected 3d points
+    _, _, _, avg_err_rcnn_rgbd_prj = computeDistErr_Depth_Projected(bbox_gt, bbox_rcnn, pw_gt, K, Pcw, frames_depth, 'centroid', num_img=950)
+    print("Average distance error between the ground truth and projected world coordinate from R-CNN bbox: %1.3f" % np.nanmean(np.absolute(avg_err_rcnn_rgbd_prj))+"%")    # avg error < 5%
+
+
 
     print("End of Program")
