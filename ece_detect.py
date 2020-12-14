@@ -7,10 +7,13 @@ import pickle
 import matplotlib.pyplot as plt
 from datetime import datetime
 from plotting import plot_frame, plot_frame_one_row, get_roi_pts
-from CalibrationOperations import getCamera3DfromImage, getGlobal3DfromCamera3D
+from calibration.CalibrationOperations import getCamera3DfromImage, getGlobal3DfromCamera3D
+from visualization import imagePlaneToWorldCoordStereo, imagePlaneToWorldCoordIPM, run3DVisualizationIPM, run3DVisualizationStereo
 
 import yaml
 import cv2
+
+import keyboard
 
 # Not sure if this is still needed for our categories
 from utils import COCO_INSTANCE_CATEGORY_NAMES as LABELS
@@ -90,8 +93,8 @@ def find3DPeopleStereo(boxes, depth_img, in_mat, ex_mat, pts_world):
         (x2, y2) = (boxes[i][2], boxes[i][3])
 
         # Find center of the box
-        x_cen = round((x2-x1)/2.0)
-        y_cen = round((y2-y1)/2.0)
+        x_cen = int((x2-x1)/2.0)
+        y_cen = int((y2-y1)/2.0)
         point = np.array([x_cen, y_cen]).T
         depth = depth_img[y_cen, x_cen]
 
@@ -163,11 +166,11 @@ def main(yaml_path,gt_path=""):
 
 
     # open video of dataset
-    rgb_cap = cv2.VideoCapture(os.path.join('datasets', 'epfl_lab', 'rgb%06d.png'))
+    rgb_cap = cv2.VideoCapture(os.path.join(r'C:\Users\rohan\Documents\repos\epfl_lab\20140804_160621_00', 'rgb%06d.png'))
     #EXAMPLE READ
     #rgb_cap = cv2.VideoCapture(os.path.join('datasets', 'TownCentreXVID.avi'))
 
-    depth_cap = cv2.VideoCapture(os.path.join('datasets', 'epfl_lab', 'depth%06d.png'))
+    depth_cap = cv2.VideoCapture(os.path.join(r'C:\Users\rohan\Documents\repos\epfl_lab\20140804_160621_00', 'depth%06d.png'))
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     i_frame = 0
@@ -183,8 +186,14 @@ def main(yaml_path,gt_path=""):
                 # Remove alpha channel
                 #test = np.zeros((428,512,3), dtype = "uint8")
                 rgb_img = cv2.cvtColor(rgb_img,cv2.COLOR_BGRA2BGR)
+                print("here")
             ret,depth_img = depth_cap.read()
 
+            '''
+            if (i_frame < 40):
+                i_frame += 1
+                continue
+            '''
             #cv2.imshow("RGB",rgb_img)
             #cv2.imshow("Depth",depth_img)
             #cv2.waitKey(1)
@@ -220,6 +229,22 @@ def main(yaml_path,gt_path=""):
             violation_pairs = find_violation(stereo_points)
 
             # Here is an example of placing dots and anomaly lines
+            person_centroids = []
+            for i in range(stereo_points.shape[0]):
+                # Get the 3D world x,y,z coordinate
+                x = stereo_points[i][0]
+                y = -stereo_points[i][1]
+                z = stereo_points[i][2]
+                person_centroids.append([x,y,z])
+
+            # Create depth map's point cloud
+            points3DWorldStereo = imagePlaneToWorldCoordStereo(rgb_img, depth_img, in_mat, ex_mat)
+
+            points3DWorldIPM = imagePlaneToWorldCoordIPM(rgb_img, in_mat, ex_mat)
+            #run3DVisualizationStereo(points3DWorldStereo,person_centroids,violation_pairs)
+
+            run3DVisualizationIPM(points3DWorldIPM,person_centroids,violation_pairs)
+            '''
             plt.cla()
             ax = fig.add_subplot(111, projection='3d')
             if(len(stereo_points) > 0 ):
@@ -227,6 +252,7 @@ def main(yaml_path,gt_path=""):
             fig.savefig(os.path.join('test_results', 'frame%04d.png' % i_frame))
             #plt.draw()
             #plt.show(block=False)
+            '''
             print("Frame: ", i_frame)
             i_frame += 1
             if i_frame == 236:
