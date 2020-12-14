@@ -11,3 +11,4 @@ The detector branch implements the efficientdet-d7 detector module. To run effic
 from run_efficientdet_detector.py with list of image paths to frames.
 
 The visualization branch implements the 3D visualization for stereo and IPM detections.
+![](demo.gif)
